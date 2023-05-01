@@ -24,7 +24,7 @@ resource "aws_instance" "webserver" {
       "sudo yum install -y httpd",
       "sudo systemctl start httpd",
       "sudo systemctl enable httpd",
-      "echo '<h1>Welcome to the Webserver!</h1>' | sudo tee /var/www/html/index.html",
+      "echo '<h1>Welcome to Jandel Webserver!</h1>' | sudo tee /var/www/html/index.html",
     ]
     
     connection {
@@ -32,7 +32,7 @@ resource "aws_instance" "webserver" {
       user        = "ec2-user"
       private_key = file(var.private_key_path)
       timeout     = "2m"
-      host        = aws_eip.webserver.public_ip
+      host        = aws_instance.webserver.public_ip
     }
   }
 }
@@ -54,9 +54,23 @@ resource "aws_security_group" "webserver_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   vpc_id = var.vpc_id
 }
 
+
 resource "aws_eip" "webserver" {
   vpc = true
+}
+
+resource "aws_eip_association" "webserver" {
+  instance_id   = aws_instance.webserver.id
+  allocation_id = aws_eip.webserver.id
+  depends_on    = [aws_eip.webserver, aws_instance.webserver]
 }
