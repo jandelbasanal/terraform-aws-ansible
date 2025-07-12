@@ -71,11 +71,88 @@
     msg: "Apache Status: {{ 'Installed - ' + apache_check.stdout.split('\n')[0] if apache_check.rc == 0 else 'Not installed' }}"
 
 # Add repository for latest PHP (Ubuntu/Debian)
-- name: Add Ondrej PHP repository (Ubuntu)
-  apt_repository:
-    repo: ppa:ondrej/php
+- name: Install software-properties-common for PPA support
+  apt:
+    name: software-properties-common
     state: present
     update_cache: yes
+  when: ansible_distribution == "Ubuntu"
+
+- name: Check internet connectivity
+  uri:
+    url: http://ppa.launchpad.net
+    method: GET
+    timeout: 10
+  register: connectivity_check
+  failed_when: false
+  when: ansible_distribution == "Ubuntu"
+
+- name: Display connectivity status
+  debug:
+    msg: "Internet connectivity to PPA: {{ 'OK' if connectivity_check.status == 200 else 'Failed - ' + (connectivity_check.msg | default('Unknown error')) }}"
+  when: ansible_distribution == "Ubuntu"
+
+- name: Add Ondrej PHP repository key (Ubuntu)
+  apt_key:
+    keyserver: keyserver.ubuntu.com
+    id: 14AA40EC0831756756D7F66C4F4EA0AAE5267A6C
+    state: present
+  when: ansible_distribution == "Ubuntu"
+  register: php_key_result
+  failed_when: false
+
+- name: Fallback - Add Ondrej PHP repository key via URL (Ubuntu)
+  apt_key:
+    url: https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x14AA40EC0831756756D7F66C4F4EA0AAE5267A6C
+    state: present
+  when: 
+    - ansible_distribution == "Ubuntu"
+    - php_key_result.failed is defined and php_key_result.failed
+
+- name: Add Ondrej PHP repository manually (Ubuntu)
+  apt_repository:
+    repo: "deb http://ppa.launchpad.net/ondrej/php/ubuntu {{ ansible_distribution_release }} main"
+    state: present
+    filename: ondrej-ubuntu-php
+  when: ansible_distribution == "Ubuntu"
+  register: php_repo_result
+  failed_when: false
+
+- name: Fallback - Create PHP repository file manually (Ubuntu)
+  copy:
+    content: |
+      deb http://ppa.launchpad.net/ondrej/php/ubuntu {{ ansible_distribution_release }} main
+      # deb-src http://ppa.launchpad.net/ondrej/php/ubuntu {{ ansible_distribution_release }} main
+    dest: /etc/apt/sources.list.d/ondrej-ubuntu-php-{{ ansible_distribution_release }}.list
+    owner: root
+    group: root
+    mode: '0644'
+  when: 
+    - ansible_distribution == "Ubuntu"
+    - php_repo_result.failed is defined and php_repo_result.failed
+
+- name: Update apt cache after adding PHP repository (Ubuntu)
+  apt:
+    update_cache: yes
+  when: ansible_distribution == "Ubuntu"
+  register: apt_update_result
+  failed_when: false
+
+- name: Check if PHP repository was added successfully
+  shell: apt-cache policy | grep -i ondrej || echo "PPA not found"
+  register: ppa_check
+  changed_when: false
+  when: ansible_distribution == "Ubuntu"
+
+- name: Display PHP repository status
+  debug:
+    msg: "PHP Repository Status: {{ 'Ondrej PPA available' if 'ondrej' in ppa_check.stdout else 'Using default Ubuntu repositories' }}"
+  when: ansible_distribution == "Ubuntu"
+
+- name: Install curl for alternative PHP installation method
+  apt:
+    name: curl
+    state: present
   when: ansible_distribution == "Ubuntu"
 
 - name: Add Ondrej PHP repository key (Debian)

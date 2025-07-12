@@ -1,0 +1,119 @@
+---
+# Simplified system preparation without external repositories
+- name: Display system information
+  debug:
+    msg:
+      - "🖥️  System Information:"
+      - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+      - "Architecture: {{ ansible_architecture }}"
+      - "Kernel: {{ ansible_kernel }}"
+      - "Memory: {{ ansible_memtotal_mb }}MB"
+      - "CPU Cores: {{ ansible_processor_vcpus }}"
+  tags: [system-prep, info]
+
+- name: Check OS compatibility
+  fail:
+    msg: "This playbook is designed for Ubuntu 20.04+ or Debian 10+. Current: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+  when: 
+    - not (ansible_distribution == "Ubuntu" and ansible_distribution_version is version("20.04", ">="))
+    - not (ansible_distribution == "Debian" and ansible_distribution_version is version("10", ">="))
+  tags: [system-prep, compatibility]
+
+- name: Update package cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  tags: [system-prep, packages]
+
+- name: Install essential system packages
+  apt:
+    name:
+      - curl
+      - wget
+      - unzip
+      - git
+      - software-properties-common
+      - apt-transport-https
+      - ca-certificates
+      - gnupg
+      - lsb-release
+    state: present
+  tags: [system-prep, packages]
+
+- name: Check if PHP is installed
+  command: php --version
+  register: php_check
+  failed_when: false
+  changed_when: false
+
+- name: Display current PHP status
+  debug:
+    msg: "PHP Status: {{ 'Installed - ' + php_check.stdout.split('\n')[0] if php_check.rc == 0 else 'Not installed' }}"
+
+- name: Check if MySQL/MariaDB is installed
+  command: mysql --version
+  register: mysql_check
+  failed_when: false
+  changed_when: false
+
+- name: Display current MySQL status
+  debug:
+    msg: "MySQL Status: {{ 'Installed - ' + mysql_check.stdout if mysql_check.rc == 0 else 'Not installed' }}"
+
+- name: Check if Apache is installed
+  command: apache2 -v
+  register: apache_check
+  failed_when: false
+  changed_when: false
+
+- name: Display current Apache status
+  debug:
+    msg: "Apache Status: {{ 'Installed - ' + apache_check.stdout.split('\n')[0] if apache_check.rc == 0 else 'Not installed' }}"
+
+# Skip external repositories - use Ubuntu defaults
+- name: Set target versions (Ubuntu default repositories)
+  set_fact:
+    target_php_version: "8.1"  # Ubuntu 22.04 default
+    target_mysql_version: "8.0"
+
+- name: Display target versions
+  debug:
+    msg: "Target versions - PHP: {{ target_php_version }}, MySQL: {{ target_mysql_version }} (from Ubuntu repositories)"
+
+# System resource checks
+- name: Check available disk space
+  shell: df -h / | awk 'NR==2 {print $4}'
+  register: disk_space
+  changed_when: false
+
+- name: Check available memory
+  debug:
+    msg: "Available disk space: {{ disk_space.stdout }}, Memory: {{ ansible_memtotal_mb }}MB"
+
+- name: Warn about low resources
+  debug:
+    msg: "⚠️  WARNING: Low system resources detected. WordPress may run slowly."
+  when: ansible_memtotal_mb < 1024
+
+# Security updates
+- name: Install security updates
+  apt:
+    upgrade: safe
+    autoremove: yes
+    autoclean: yes
+  register: security_updates
+
+- name: Display update status
+  debug:
+    msg: "Security updates installed: {{ security_updates.changed }}"
+
+# Timezone configuration
+- name: Set timezone to UTC
+  timezone:
+    name: UTC
+  notify: restart cron
+
+- name: System preparation completed
+  debug:
+    msg: "✅ System preparation completed successfully! Using Ubuntu default repositories."
+  tags: [system-prep, always]

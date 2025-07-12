@@ -13,28 +13,66 @@
     msg: "PHP Status: {{ 'Already installed - ' + php_current_status.stdout.split('\n')[0] if php_current_status.rc == 0 else 'Not installed, will install latest' }}"
 
 # Set target PHP version (latest stable)
-- name: Set target PHP version
+- name: Check if Ondrej PPA is available
+  shell: apt-cache policy | grep -i ondrej || echo "PPA not found"
+  register: ondrej_ppa_check
+  changed_when: false
+
+- name: Set target PHP version based on available repositories
   set_fact:
-    target_php_version: "8.3"
-    php_packages:
-      - "php{{ target_php_version }}"
-      - "php{{ target_php_version }}-mysql"
-      - "php{{ target_php_version }}-curl"
-      - "php{{ target_php_version }}-gd"
-      - "php{{ target_php_version }}-mbstring"
-      - "php{{ target_php_version }}-xml"
-      - "php{{ target_php_version }}-xmlrpc"
-      - "php{{ target_php_version }}-soap"
-      - "php{{ target_php_version }}-intl"
-      - "php{{ target_php_version }}-zip"
-      - "php{{ target_php_version }}-fpm"
-      - "libapache2-mod-php{{ target_php_version }}"
+    target_php_version: "{{ '8.3' if 'ondrej' in ondrej_ppa_check.stdout else '8.1' }}"
+    php_packages: "{{ php_packages_ondrej if 'ondrej' in ondrej_ppa_check.stdout else php_packages_default }}"
+  vars:
+    php_packages_ondrej:
+      - "php8.3"
+      - "php8.3-mysql"
+      - "php8.3-curl"
+      - "php8.3-gd"
+      - "php8.3-mbstring"
+      - "php8.3-xml"
+      - "php8.3-xmlrpc"
+      - "php8.3-soap"
+      - "php8.3-intl"
+      - "php8.3-zip"
+      - "php8.3-fpm"
+      - "libapache2-mod-php8.3"
+    php_packages_default:
+      - "php"
+      - "php-mysql"
+      - "php-curl"
+      - "php-gd"
+      - "php-mbstring"
+      - "php-xml"
+      - "php-xmlrpc"
+      - "php-soap"
+      - "php-intl"
+      - "php-zip"
+      - "php-fpm"
+      - "libapache2-mod-php"
+
+- name: Display selected PHP version and source
+  debug:
+    msg: "Installing PHP {{ target_php_version }} from {{ 'Ondrej PPA' if 'ondrej' in ondrej_ppa_check.stdout else 'Ubuntu default repositories' }}"
 
 # Install PHP and required modules
 - name: Install PHP and required modules
   apt:
     name: "{{ php_packages }}"
     state: present
+  register: php_install_result
+  failed_when: false
+
+- name: Use fallback PHP installation if main installation fails
+  include_tasks: fallback.yml
+  vars:
+    php_repo_fallback: true
+  when: php_install_result.failed is defined and php_install_result.failed
+
+- name: Verify PHP installation
+  command: php --version
+  register: php_verify
+  failed_when: php_verify.rc != 0
+  changed_when: false
 
 - name: Get installed PHP version
   command: php -r "echo PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;"

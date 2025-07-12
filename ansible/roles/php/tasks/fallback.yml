@@ -1,0 +1,43 @@
+---
+# Alternative PHP installation without external repositories
+- name: Install PHP from Ubuntu default repositories (fallback)
+  apt:
+    name:
+      - php
+      - php-mysql
+      - php-curl
+      - php-gd
+      - php-mbstring
+      - php-xml
+      - php-soap
+      - php-intl
+      - php-zip
+      - php-fpm
+      - libapache2-mod-php
+    state: present
+    update_cache: yes
+  when: 
+    - php_repo_fallback is defined
+    - php_repo_fallback
+
+- name: Get installed PHP version (fallback)
+  command: php -r "echo PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;"
+  register: fallback_php_version
+  changed_when: false
+  when: 
+    - php_repo_fallback is defined
+    - php_repo_fallback
+
+- name: Set PHP version fact (fallback)
+  set_fact:
+    php_version: "{{ fallback_php_version.stdout }}"
+  when: 
+    - php_repo_fallback is defined
+    - php_repo_fallback
+
+- name: Display fallback PHP installation
+  debug:
+    msg: "Fallback PHP installation completed - Version: {{ php_version }}"
+  when: 
+    - php_repo_fallback is defined
+    - php_repo_fallback
