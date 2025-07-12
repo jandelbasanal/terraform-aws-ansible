@@ -231,19 +231,20 @@ echo ""
 echo "📝 Step 3: Configuring Ansible inventory..."
 cd ansible
 
-# Update inventory with the actual IP
+# Update inventory with the actual IP and SSH key
 SSH_KEY_ABSOLUTE=$(realpath "$SSH_KEY_PATH")
 cat > inventory/hosts.ini << EOF
 [wordpress]
-$PUBLIC_IP ansible_ssh_private_key_file=$SSH_KEY_ABSOLUTE
+$PUBLIC_IP
 
 [wordpress:vars]
 ansible_user=ubuntu
+ansible_ssh_private_key_file=$SSH_KEY_ABSOLUTE
 ansible_ssh_common_args='-o StrictHostKeyChecking=no'
 EOF
 
 # Update ansible.cfg with the correct key path
-sed -i.bak "s|private_key_file = ~/.ssh/your-key.pem|private_key_file = $SSH_KEY_ABSOLUTE|" ansible.cfg
+sed -i.bak "s|private_key_file = .*|private_key_file = $SSH_KEY_ABSOLUTE|" ansible.cfg
 
 echo "✅ Inventory configured with IP: $PUBLIC_IP"
 

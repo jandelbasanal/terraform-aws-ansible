@@ -18,17 +18,41 @@ fi
 # Fix 2: Update inventory with absolute path
 echo "📝 Fixing inventory SSH key path..."
 if [ -f "ansible/inventory/hosts.ini" ]; then
-    # Get the absolute path to wtv.pem
-    SSH_KEY_ABSOLUTE=$(realpath "wtv.pem")
+    # First, try to find the SSH key
+    SSH_KEY_ABSOLUTE=""
+    
+    # Check if wtv.pem exists in current directory
+    if [ -f "wtv.pem" ]; then
+        SSH_KEY_ABSOLUTE=$(realpath "wtv.pem")
+        echo "SSH Key found in current directory: $SSH_KEY_ABSOLUTE"
+    # Check if wtv.pem exists in parent directory
+    elif [ -f "../wtv.pem" ]; then
+        SSH_KEY_ABSOLUTE=$(realpath "../wtv.pem")
+        echo "SSH Key found in parent directory: $SSH_KEY_ABSOLUTE"
+    # Check if it's already in ansible directory
+    elif [ -f "ansible/wtv.pem" ]; then
+        SSH_KEY_ABSOLUTE=$(realpath "ansible/wtv.pem")
+        echo "SSH Key found in ansible directory: $SSH_KEY_ABSOLUTE"
+    else
+        echo "❌ SSH key 'wtv.pem' not found in:"
+        echo "  - Current directory: $(pwd)"
+        echo "  - Parent directory: $(dirname $(pwd))"
+        echo "  - Ansible directory: $(pwd)/ansible"
+        echo ""
+        echo "Please ensure wtv.pem is in one of these locations"
+        exit 1
+    fi
     
     if [ -f "$SSH_KEY_ABSOLUTE" ]; then
         echo "SSH Key found at: $SSH_KEY_ABSOLUTE"
         
-        # Update inventory
+        # Update inventory - handle both possible current paths
         sed -i "s|ansible_ssh_private_key_file=wtv.pem|ansible_ssh_private_key_file=$SSH_KEY_ABSOLUTE|" ansible/inventory/hosts.ini
+        sed -i "s|ansible_ssh_private_key_file=.*/wtv.pem|ansible_ssh_private_key_file=$SSH_KEY_ABSOLUTE|" ansible/inventory/hosts.ini
         
         # Update ansible.cfg
         sed -i "s|private_key_file = ~/.ssh/your-key.pem|private_key_file = $SSH_KEY_ABSOLUTE|" ansible/ansible.cfg
+        sed -i "s|private_key_file = .*/wtv.pem|private_key_file = $SSH_KEY_ABSOLUTE|" ansible/ansible.cfg
         
         echo "✅ Updated inventory and ansible.cfg with absolute path"
     else
