@@ -28,6 +28,7 @@
         timeout: 300
 
   roles:
+    - system-prep
     - common
     - mysql
     - apache

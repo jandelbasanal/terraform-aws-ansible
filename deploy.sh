@@ -505,11 +505,58 @@ cd ansible
 # Test Ansible connectivity
 echo "Testing Ansible connectivity..."
 ansible --version
-ansible -i inventory/hosts.ini all -m ping
+if ! ansible -i inventory/hosts.ini all -m ping; then
+    echo "❌ Ansible connectivity test failed!"
+    echo "💡 Common issues:"
+    echo "   - Check if SSH key has correct permissions: chmod 600 $SSH_KEY_ABSOLUTE"
+    echo "   - Verify instance is running and accessible"
+    echo "   - Check security group allows SSH (port 22)"
+    echo "   - Ensure SSH key matches the one used for EC2 instance"
+    exit 1
+fi
 
 # Run the WordPress deployment playbook
 echo "🚀 Running WordPress deployment playbook..."
-ansible-playbook -i inventory/hosts.ini playbooks/site.yml
+echo "📋 This deployment will:"
+echo "   1. 🔍 Check OS version and system compatibility"
+echo "   2. 📦 Detect existing PHP/MySQL/Apache installations"
+echo "   3. 🔄 Install or upgrade to latest stable versions:"
+echo "      - PHP 8.3 (with all required modules)"
+echo "      - MySQL 8.0 (latest stable)"
+echo "      - Apache 2.4"
+echo "   4. 🛠️  Configure LAMP stack optimally"
+echo "   5. 📥 Download and install latest WordPress"
+echo "   6. 🔧 Configure WordPress with database"
+echo "   7. 🔐 Set up security and firewall"
+echo ""
+
+if ! ansible-playbook -i inventory/hosts.ini playbooks/site.yml; then
+    echo "❌ Ansible playbook execution failed!"
+    echo ""
+    echo "🔍 Troubleshooting steps:"
+    echo "1. Check the error message above for specific task failures"
+    echo "2. Common PHP configuration issues:"
+    echo "   - PHP version mismatch (script detects and handles this)"
+    echo "   - Missing PHP modules (script installs required ones)"
+    echo "   - PHP configuration file location (script has fallback logic)"
+    echo "3. MySQL connection issues:"
+    echo "   - Check if MySQL service is running"
+    echo "   - Verify database credentials"
+    echo "4. Apache configuration issues:"
+    echo "   - Check if Apache service is running"
+    echo "   - Verify virtual host configuration"
+    echo "5. WordPress download/extraction issues:"
+    echo "   - Check internet connectivity on the instance"
+    echo "   - Verify /var/www/html permissions"
+    echo ""
+    echo "📋 To debug further, you can:"
+    echo "   - SSH into the instance: ssh -i $SSH_KEY_ABSOLUTE ubuntu@$INSTANCE_IP"
+    echo "   - Check service status: sudo systemctl status apache2 mysql"
+    echo "   - View logs: sudo journalctl -u apache2 -f"
+    echo "   - Re-run with more verbose output: ansible-playbook -i inventory/hosts.ini playbooks/site.yml -vvv"
+    echo ""
+    exit 1
+fi
 
 # Return to project root
 cd "$REPO_ROOT"

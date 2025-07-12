@@ -1,25 +1,87 @@
 ---
 # PHP installation and configuration
+
+# Check current PHP installation
+- name: Check if PHP is already installed
+  command: php --version
+  register: php_current_status
+  failed_when: false
+  changed_when: false
+
+- name: Display current PHP status
+  debug:
+    msg: "PHP Status: {{ 'Already installed - ' + php_current_status.stdout.split('\n')[0] if php_current_status.rc == 0 else 'Not installed, will install latest' }}"
+
+# Set target PHP version (latest stable)
+- name: Set target PHP version
+  set_fact:
+    target_php_version: "8.3"
+    php_packages:
+      - "php{{ target_php_version }}"
+      - "php{{ target_php_version }}-mysql"
+      - "php{{ target_php_version }}-curl"
+      - "php{{ target_php_version }}-gd"
+      - "php{{ target_php_version }}-mbstring"
+      - "php{{ target_php_version }}-xml"
+      - "php{{ target_php_version }}-xmlrpc"
+      - "php{{ target_php_version }}-soap"
+      - "php{{ target_php_version }}-intl"
+      - "php{{ target_php_version }}-zip"
+      - "php{{ target_php_version }}-fpm"
+      - "libapache2-mod-php{{ target_php_version }}"
+
+# Install PHP and required modules
 - name: Install PHP and required modules
   apt:
-    name:
-      - php
-      - php-mysql
-      - php-curl
-      - php-gd
-      - php-mbstring
-      - php-xml
-      - php-xmlrpc
-      - php-soap
-      - php-intl
-      - php-zip
-      - php-fpm
-      - libapache2-mod-php
+    name: "{{ php_packages }}"
     state: present
+
+- name: Get installed PHP version
+  command: php -r "echo PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;"
+  register: php_version_output
+  changed_when: false
+
+- name: Set PHP version fact
+  set_fact:
+    php_version: "{{ php_version_output.stdout }}"
+
+- name: Verify PHP version matches target
+  debug:
+    msg: "Installed PHP version: {{ php_version }} (target: {{ target_php_version }})"
+
+- name: Debug PHP version
+  debug:
+    msg: "Detected PHP version: {{ php_version }}"
+
+- name: Ensure PHP configuration directory exists
+  file:
+    path: "/etc/php/{{ php_version }}/apache2"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Check if PHP Apache config exists
+  stat:
+    path: "/etc/php/{{ php_version }}/apache2/php.ini"
+  register: php_apache_config
+
+- name: Check if PHP FPM config exists
+  stat:
+    path: "/etc/php/{{ php_version }}/fpm/php.ini"
+  register: php_fpm_config
+
+- name: Set PHP config path
+  set_fact:
+    php_config_path: "{{ '/etc/php/' + php_version + '/apache2/php.ini' if php_apache_config.stat.exists else '/etc/php/' + php_version + '/fpm/php.ini' }}"
+
+- name: Debug PHP config path
+  debug:
+    msg: "Using PHP config path: {{ php_config_path }}"
 
 - name: Configure PHP settings
   lineinfile:
-    path: /etc/php/8.1/apache2/php.ini
+    path: "{{ php_config_path }}"
     regexp: "{{ item.regexp }}"
     line: "{{ item.line }}"
     backup: yes
@@ -30,6 +92,70 @@
     - { regexp: '^max_execution_time', line: 'max_execution_time = 300' }
     - { regexp: '^max_input_vars', line: 'max_input_vars = 3000' }
   notify: restart apache
+  when: php_apache_config.stat.exists or php_fpm_config.stat.exists
+
+- name: Show warning if no PHP config found
+  debug:
+    msg: "Warning: Could not find PHP configuration file. Checked paths: /etc/php/{{ php_version }}/apache2/php.ini and /etc/php/{{ php_version }}/fpm/php.ini"
+  when: not (php_apache_config.stat.exists or php_fpm_config.stat.exists)
+
+- name: Find PHP configuration files if standard paths don't exist
+  find:
+    paths: /etc/php
+    patterns: "php.ini"
+    recurse: yes
+  register: php_config_files
+  when: not (php_apache_config.stat.exists or php_fpm_config.stat.exists)
+
+- name: Debug found PHP config files
+  debug:
+    msg: "Found PHP config files: {{ php_config_files.files | map(attribute='path') | list }}"
+  when: 
+    - not (php_apache_config.stat.exists or php_fpm_config.stat.exists)
+    - php_config_files.files | length > 0
+
+- name: Set fallback PHP config path
+  set_fact:
+    fallback_php_config_path: "{{ php_config_files.files | selectattr('path', 'match', '.*apache2.*') | map(attribute='path') | first | default(php_config_files.files[0].path) }}"
+  when: 
+    - not (php_apache_config.stat.exists or php_fpm_config.stat.exists)
+    - php_config_files.files | length > 0
+
+- name: Use alternative PHP config if found
+  lineinfile:
+    path: "{{ fallback_php_config_path }}"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    backup: yes
+  loop:
+    - { regexp: '^upload_max_filesize', line: 'upload_max_filesize = 64M' }
+    - { regexp: '^post_max_size', line: 'post_max_size = 64M' }
+    - { regexp: '^memory_limit', line: 'memory_limit = 256M' }
+    - { regexp: '^max_execution_time', line: 'max_execution_time = 300' }
+    - { regexp: '^max_input_vars', line: 'max_input_vars = 3000' }
+  notify: restart apache
+  when: 
+    - not (php_apache_config.stat.exists or php_fpm_config.stat.exists)
+    - php_config_files.files | length > 0
+
+- name: Final fallback - create basic PHP configuration if none found
+  copy:
+    content: |
+      ; Basic PHP configuration created by Ansible
+      upload_max_filesize = 64M
+      post_max_size = 64M
+      memory_limit = 256M
+      max_execution_time = 300
+      max_input_vars = 3000
+    dest: "/etc/php/{{ php_version }}/apache2/php.ini"
+    owner: root
+    group: root
+    mode: '0644'
+    backup: yes
+  notify: restart apache
+  when: 
+    - not (php_apache_config.stat.exists or php_fpm_config.stat.exists)
+    - php_config_files.files | length == 0
 
 - name: Check if PHP info page exists
   stat:

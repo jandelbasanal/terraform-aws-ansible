@@ -1,0 +1,6 @@
+---
+# Handlers for system-prep role
+- name: restart cron
+  service:
+    name: cron
+    state: restarted

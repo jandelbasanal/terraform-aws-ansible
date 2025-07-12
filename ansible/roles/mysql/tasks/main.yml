@@ -1,5 +1,37 @@
 ---
 # MySQL installation and configuration
+
+# Check current MySQL installation
+- name: Check if MySQL is already installed
+  command: mysql --version
+  register: mysql_current_version
+  failed_when: false
+  changed_when: false
+
+- name: Display current MySQL status
+  debug:
+    msg: "MySQL Status: {{ 'Already installed - ' + mysql_current_version.stdout if mysql_current_version.rc == 0 else 'Not installed, will install latest' }}"
+
+# Add MySQL APT repository for latest version
+- name: Download MySQL APT repository package
+  get_url:
+    url: https://dev.mysql.com/get/mysql-apt-config_0.8.24-1_all.deb
+    dest: /tmp/mysql-apt-config.deb
+    mode: '0644'
+  when: mysql_current_version.rc != 0
+
+- name: Install MySQL APT repository
+  apt:
+    deb: /tmp/mysql-apt-config.deb
+    state: present
+  when: mysql_current_version.rc != 0
+
+- name: Update apt cache after adding MySQL repository
+  apt:
+    update_cache: yes
+  when: mysql_current_version.rc != 0
+
+# Install MySQL server with latest version
 - name: Install MySQL server
   apt:
     name:

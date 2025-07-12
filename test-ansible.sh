@@ -57,7 +57,19 @@ ansible all -i inventory/hosts.ini -m ping
 if [ $? -eq 0 ]; then
     echo ""
     echo "✅ Connectivity test passed!"
-    echo "🚀 Starting WordPress deployment..."
+    
+    # Optional: Run system check first
+    echo "� Checking target system information..."
+    ansible all -i inventory/hosts.ini -m setup -a "filter=ansible_distribution*,ansible_memtotal_mb,ansible_architecture"
+    
+    echo ""
+    echo "�🚀 Starting WordPress deployment with system preparation..."
+    echo "📋 This will:"
+    echo "   1. 🔍 Check OS version and compatibility"
+    echo "   2. 📦 Check existing PHP/MySQL installations"
+    echo "   3. 🔄 Install/upgrade to latest versions if needed"
+    echo "   4. 🛠️  Configure WordPress environment"
+    echo ""
     
     # Run the WordPress playbook
     ansible-playbook -i inventory/hosts.ini playbooks/site.yml
