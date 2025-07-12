@@ -1,5 +1,5 @@
 provider "aws" {
-  region = "ap-northeast-1"
+  region = var.aws_region
 }
 
 module "vpc" {
@@ -19,5 +19,6 @@ module "ec2" {
   source = "./modules/ec2"
 
   subnet_id = module.subnet.public_subnet_1_id
-  key_name  = "wtv"
+  key_name  = var.key_name
+  ami_id    = var.ami_id
 }

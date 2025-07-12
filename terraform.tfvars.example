@@ -1,0 +1,13 @@
+# Copy this file to terraform.tfvars and update with your values
+# terraform.tfvars is ignored by git to keep sensitive data secure
+
+# AWS Region (optional, defaults to ap-northeast-1)
+aws_region = "ap-northeast-1"
+
+# AWS Key Pair name (required)
+# Create a key pair in AWS EC2 console first
+key_name = "your-key-pair-name"
+
+# AMI ID (optional, defaults to Ubuntu 24.04 LTS in ap-northeast-1)
+# Update this if you're using a different region or want a different AMI
+ami_id = "ami-054400ced365b82a0"
