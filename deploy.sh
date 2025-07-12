@@ -164,17 +164,24 @@ fi
 
 SSH_KEY_PATH="$1"
 
+# Resolve SSH key path early - before changing directories
+# This ensures relative paths are resolved from the original working directory
+SSH_KEY_ABSOLUTE=$(realpath "$SSH_KEY_PATH")
+
 # Validate SSH key exists
-if [ ! -f "$SSH_KEY_PATH" ]; then
-    echo "❌ Error: SSH key not found at $SSH_KEY_PATH"
+if [ ! -f "$SSH_KEY_ABSOLUTE" ]; then
+    echo "❌ Error: SSH key not found at $SSH_KEY_ABSOLUTE"
+    echo "Original path provided: $SSH_KEY_PATH"
+    echo "Current directory: $(pwd)"
     exit 1
 fi
 
 # Set proper permissions on SSH key
-chmod 600 "$SSH_KEY_PATH"
+chmod 600 "$SSH_KEY_ABSOLUTE"
 
 echo "✅ Dependencies check passed"
-echo "✅ SSH key found: $SSH_KEY_PATH"
+echo "✅ SSH key found: $SSH_KEY_ABSOLUTE"
+echo "📁 Original SSH key path: $SSH_KEY_PATH"
 
 # Step 1: Deploy infrastructure with Terraform
 echo ""
@@ -231,8 +238,7 @@ echo ""
 echo "📝 Step 3: Configuring Ansible inventory..."
 cd ansible
 
-# Update inventory with the actual IP and SSH key
-SSH_KEY_ABSOLUTE=$(realpath "$SSH_KEY_PATH")
+# Update inventory with the actual IP and SSH key (using pre-resolved absolute path)
 cat > inventory/hosts.ini << EOF
 [wordpress]
 $PUBLIC_IP
@@ -247,6 +253,7 @@ EOF
 sed -i.bak "s|private_key_file = .*|private_key_file = $SSH_KEY_ABSOLUTE|" ansible.cfg
 
 echo "✅ Inventory configured with IP: $PUBLIC_IP"
+echo "✅ SSH key path in inventory: $SSH_KEY_ABSOLUTE"
 
 # Step 4: Deploy WordPress with Ansible
 echo ""
@@ -300,7 +307,7 @@ if [ $? -eq 0 ]; then
     echo "   - Review security group settings"
     echo ""
     echo "🛠️  Management:"
-    echo "   - SSH to server: ssh -i $SSH_KEY_PATH ubuntu@$PUBLIC_IP"
+    echo "   - SSH to server: ssh -i $SSH_KEY_ABSOLUTE ubuntu@$PUBLIC_IP"
     echo "   - View logs: tail -f /var/log/apache2/error.log"
     echo "   - Restart services: sudo systemctl restart apache2"
 else
