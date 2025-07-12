@@ -1,6 +1,10 @@
 #!/bin/bash
 # Dependency check script
 
+# Source version configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/version-config.sh"
+
 echo "🔍 Checking system dependencies..."
 echo "================================="
 
@@ -76,8 +80,8 @@ done
 
 # Check Terraform
 if check_command "terraform"; then
-    TERRAFORM_VERSION=$(terraform version | grep -oP 'Terraform v\K[0-9.]+' | head -1)
-    if ! check_version "Terraform" "1.12.0" "$TERRAFORM_VERSION"; then
+    TERRAFORM_VERSION_CURRENT=$(terraform version | grep -oP 'Terraform v\K[0-9.]+' | head -1)
+    if ! check_version "Terraform" "$TERRAFORM_VERSION" "$TERRAFORM_VERSION_CURRENT"; then
         MISSING_TOOLS+=("terraform-upgrade")
     fi
 else
@@ -87,7 +91,7 @@ fi
 # Check AWS CLI
 if check_command "aws"; then
     AWS_VERSION=$(aws --version | grep -oP 'aws-cli/\K[0-9.]+' | head -1)
-    if ! check_version "AWS CLI" "2.0.0" "$AWS_VERSION"; then
+    if ! check_version "AWS CLI" "$AWS_CLI_VERSION" "$AWS_VERSION"; then
         MISSING_TOOLS+=("aws-cli-upgrade")
     fi
 else
@@ -96,11 +100,11 @@ fi
 
 # Check Ansible
 if check_command "ansible"; then
-    ANSIBLE_VERSION=$(ansible --version | grep -oP 'ansible \[core \K[0-9.]+' | head -1)
-    if [[ -z "$ANSIBLE_VERSION" ]]; then
-        ANSIBLE_VERSION=$(ansible --version | grep -oP 'ansible \K[0-9.]+' | head -1)
+    ANSIBLE_VERSION_CURRENT=$(ansible --version | grep -oP 'ansible \[core \K[0-9.]+' | head -1)
+    if [[ -z "$ANSIBLE_VERSION_CURRENT" ]]; then
+        ANSIBLE_VERSION_CURRENT=$(ansible --version | grep -oP 'ansible \K[0-9.]+' | head -1)
     fi
-    if ! check_version "Ansible" "6.0.0" "$ANSIBLE_VERSION"; then
+    if ! check_version "Ansible" "$ANSIBLE_VERSION" "$ANSIBLE_VERSION_CURRENT"; then
         MISSING_TOOLS+=("ansible-upgrade")
     fi
 else

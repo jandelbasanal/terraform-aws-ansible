@@ -3,6 +3,10 @@
 
 set -e
 
+# Source version configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/version-config.sh"
+
 echo "🛠️  Setting up execution machine for Terraform + Ansible deployment"
 echo "================================================================="
 
@@ -13,18 +17,18 @@ if ! command -v apt &> /dev/null; then
 fi
 
 # Check Ubuntu version
-UBUNTU_VERSION=$(lsb_release -rs 2>/dev/null || echo "unknown")
-if [[ "$UBUNTU_VERSION" != "unknown" ]]; then
-    MAJOR_VERSION=$(echo "$UBUNTU_VERSION" | cut -d. -f1)
+UBUNTU_VERSION_CURRENT=$(lsb_release -rs 2>/dev/null || echo "unknown")
+if [[ "$UBUNTU_VERSION_CURRENT" != "unknown" ]]; then
+    MAJOR_VERSION=$(echo "$UBUNTU_VERSION_CURRENT" | cut -d. -f1)
     if (( MAJOR_VERSION < 22 )); then
-        echo "⚠️  Warning: This script is optimized for Ubuntu 22.04+. Current version: $UBUNTU_VERSION"
+        echo "⚠️  Warning: This script is optimized for Ubuntu 22.04+. Current version: $UBUNTU_VERSION_CURRENT"
         echo "Continue anyway? (y/N)"
         read -r response
         if [[ ! "$response" =~ ^[Yy]$ ]]; then
             exit 1
         fi
     fi
-    echo "✅ Ubuntu version: $UBUNTU_VERSION"
+    echo "✅ Ubuntu version: $UBUNTU_VERSION_CURRENT"
 fi
 
 # Update system
@@ -68,59 +72,60 @@ version_compare() {
 
 # Install/Upgrade Terraform
 echo "📦 Checking Terraform installation..."
-REQUIRED_TERRAFORM_VERSION="1.12.0"
+REQUIRED_TERRAFORM_VERSION="$TERRAFORM_VERSION"
 CURRENT_TERRAFORM_VERSION=""
 
 if command -v terraform &> /dev/null; then
     CURRENT_TERRAFORM_VERSION=$(terraform version -json | jq -r '.terraform_version' 2>/dev/null || terraform version | grep -oP 'Terraform v\K[0-9.]+' | head -1)
     echo "Current Terraform version: $CURRENT_TERRAFORM_VERSION"
     
-    version_compare "$CURRENT_TERRAFORM_VERSION" "$REQUIRED_TERRAFORM_VERSION"
-    case $? in
-        0) echo "✅ Terraform version is exactly $REQUIRED_TERRAFORM_VERSION" ;;
-        1) echo "✅ Terraform version $CURRENT_TERRAFORM_VERSION is newer than required $REQUIRED_TERRAFORM_VERSION" ;;
-        2) 
-            echo "⚠️  Terraform version $CURRENT_TERRAFORM_VERSION is older than required $REQUIRED_TERRAFORM_VERSION"
-            echo "🔄 Upgrading Terraform..."
-            INSTALL_TERRAFORM=true
-            ;;
-    esac
+    if [[ "$CURRENT_TERRAFORM_VERSION" == "$REQUIRED_TERRAFORM_VERSION" ]]; then
+        echo "✅ Terraform version matches required: $REQUIRED_TERRAFORM_VERSION"
+        INSTALL_TERRAFORM=false
+    else
+        echo "⚠️  Terraform version $CURRENT_TERRAFORM_VERSION does not match required $REQUIRED_TERRAFORM_VERSION"
+        echo "🔄 Installing Terraform $REQUIRED_TERRAFORM_VERSION..."
+        INSTALL_TERRAFORM=true
+    fi
 else
     echo "❌ Terraform not found"
-    echo "📥 Installing Terraform..."
+    echo "📥 Installing Terraform $REQUIRED_TERRAFORM_VERSION..."
     INSTALL_TERRAFORM=true
 fi
 
 if [[ "$INSTALL_TERRAFORM" == "true" ]]; then
     # Remove old terraform if exists
     if command -v terraform &> /dev/null; then
+        echo "🗑️  Removing existing Terraform installation..."
         sudo rm -f /usr/local/bin/terraform
     fi
     
-    # Get latest Terraform version if required version is not available
+    # Download specific version
     echo "📥 Downloading Terraform $REQUIRED_TERRAFORM_VERSION..."
+    TERRAFORM_ZIP="terraform_${REQUIRED_TERRAFORM_VERSION}_linux_amd64.zip"
     
-    # Check if specific version exists, otherwise get latest
-    if curl -s -f "https://releases.hashicorp.com/terraform/${REQUIRED_TERRAFORM_VERSION}/terraform_${REQUIRED_TERRAFORM_VERSION}_linux_amd64.zip" >/dev/null 2>&1; then
-        TERRAFORM_VERSION="$REQUIRED_TERRAFORM_VERSION"
+    # Check if specific version exists
+    if curl -s -f "https://releases.hashicorp.com/terraform/${REQUIRED_TERRAFORM_VERSION}/${TERRAFORM_ZIP}" --head >/dev/null 2>&1; then
+        wget "https://releases.hashicorp.com/terraform/${REQUIRED_TERRAFORM_VERSION}/${TERRAFORM_ZIP}"
+        unzip "$TERRAFORM_ZIP"
+        sudo mv terraform /usr/local/bin/
+        rm "$TERRAFORM_ZIP"
+        
+        # Verify installation
+        INSTALLED_VERSION=$(terraform version | grep -oP 'Terraform v\K[0-9.]+' | head -1)
+        if [[ "$INSTALLED_VERSION" == "$REQUIRED_TERRAFORM_VERSION" ]]; then
+            echo "✅ Terraform $REQUIRED_TERRAFORM_VERSION installed successfully"
+        else
+            echo "❌ Terraform installation failed. Got version: $INSTALLED_VERSION"
+            exit 1
+        fi
     else
-        echo "⚠️  Terraform $REQUIRED_TERRAFORM_VERSION not found, getting latest version..."
-        TERRAFORM_VERSION=$(curl -s https://api.github.com/repos/hashicorp/terraform/releases/latest | jq -r '.tag_name' | sed 's/v//')
-        echo "📥 Using Terraform version: $TERRAFORM_VERSION"
+        echo "❌ Terraform version $REQUIRED_TERRAFORM_VERSION not found in HashiCorp releases"
+        echo "Available versions: https://releases.hashicorp.com/terraform/"
+        exit 1
     fi
-    
-    # Download and install
-    TERRAFORM_ZIP="terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
-    wget "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/${TERRAFORM_ZIP}"
-    unzip "$TERRAFORM_ZIP"
-    sudo mv terraform /usr/local/bin/
-    rm "$TERRAFORM_ZIP"
-    
-    # Verify installation
-    INSTALLED_VERSION=$(terraform version | grep -oP 'Terraform v\K[0-9.]+' | head -1)
-    echo "✅ Terraform installed: v$INSTALLED_VERSION"
 else
-    echo "✅ Terraform already installed: v$CURRENT_TERRAFORM_VERSION"
+    echo "✅ Terraform is already at the required version: $CURRENT_TERRAFORM_VERSION"
 fi
 
 # Install AWS CLI v2
@@ -164,7 +169,7 @@ fi
 
 # Install/Upgrade Ansible
 echo "📦 Checking Ansible installation..."
-REQUIRED_ANSIBLE_VERSION="6.0.0"
+REQUIRED_ANSIBLE_VERSION="$ANSIBLE_VERSION"
 
 if command -v ansible &> /dev/null; then
     CURRENT_ANSIBLE_VERSION=$(ansible --version | grep -oP 'ansible \[core \K[0-9.]+' | head -1)

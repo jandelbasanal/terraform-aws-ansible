@@ -19,11 +19,23 @@ chmod +x setup-execution-machine.sh
 
 This script automatically:
 - ✅ Checks Ubuntu version (optimized for 22.04+)
-- ✅ Installs/upgrades Terraform to v1.12.0+
+- ✅ Installs/upgrades Terraform to v1.12.2 (exact version enforced)
 - ✅ Installs/upgrades AWS CLI to v2.x
 - ✅ Installs/upgrades Ansible to v6.0.0+ in virtual environment
 - ✅ Sets up proper PATH and environment
 - ✅ Installs essential tools (curl, wget, git, jq, etc.)
+
+### 2.1. Version Management (Optional)
+```bash
+# Check version requirements
+./version-manager.sh show
+
+# Check latest versions available
+./version-manager.sh check
+
+# Update version requirements if needed
+./version-manager.sh update terraform 1.12.3
+```
 
 ### 3. Configure AWS Credentials
 ```bash
@@ -82,6 +94,40 @@ pip install 'ansible>=6.0.0' PyMySQL boto3 botocore
 sudo ln -sf ~/.ansible-venv/bin/ansible /usr/local/bin/ansible
 sudo ln -sf ~/.ansible-venv/bin/ansible-playbook /usr/local/bin/ansible-playbook
 ```
+
+## Version Management
+
+This project uses a centralized version management system for consistent deployments:
+
+### Current Version Requirements
+- **Terraform**: 1.12.2 (enforced exactly)
+- **AWS CLI**: 2.0.0+ (minimum v2.x)
+- **Ansible**: 6.0.0+ (minimum)
+- **Python**: 3.8+ (minimum)
+- **Ubuntu**: 22.04+ (recommended)
+
+### Version Commands
+```bash
+# Check current version requirements
+./version-manager.sh show
+
+# Check latest available versions online
+./version-manager.sh check
+
+# Update version requirements
+./version-manager.sh update terraform 1.12.3
+./version-manager.sh update aws-cli 2.15.0
+
+# Re-run setup to install new versions
+./setup-execution-machine.sh
+```
+
+### Version Enforcement
+The setup script (`setup-execution-machine.sh`):
+- Enforces exact Terraform version (1.12.2)
+- Downloads and installs if current version doesn't match
+- Validates installation after completion
+- Uses centralized version configuration
 
 ## Security Considerations
 
