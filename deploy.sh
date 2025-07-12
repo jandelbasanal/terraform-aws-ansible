@@ -6,15 +6,49 @@ set -e
 echo "🚀 Starting Terraform + Ansible WordPress Deployment"
 echo "===================================================="
 
-# Check if we're in the correct directory
+# Get script directory and repository root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$SCRIPT_DIR"
+
+# Check if we're in the correct directory, if not try to find it
 if [ ! -d "terraform" ] || [ ! -d "ansible" ]; then
-    echo "❌ Error: Please run this script from the repository root"
+    echo "⚠️  Not in repository root, attempting to locate..."
+    
+    # Try to find terraform-aws-ansible directory
+    if [ -d "terraform-aws-ansible" ]; then
+        echo "📁 Found terraform-aws-ansible directory, changing to it..."
+        cd terraform-aws-ansible
+        REPO_ROOT="$(pwd)"
+    elif [ -d "../terraform-aws-ansible" ]; then
+        echo "📁 Found terraform-aws-ansible directory (parent), changing to it..."
+        cd ../terraform-aws-ansible
+        REPO_ROOT="$(pwd)"
+    else
+        echo "❌ Error: Could not find terraform-aws-ansible directory"
+        echo "Please run this script from:"
+        echo "  - Repository root (where terraform/ and ansible/ exist)"
+        echo "  - A directory containing terraform-aws-ansible/"
+        echo "  - Parent directory of terraform-aws-ansible/"
+        echo ""
+        echo "Current directory: $(pwd)"
+        echo "Script location: $SCRIPT_DIR"
+        exit 1
+    fi
+fi
+
+# Verify we're now in the correct directory
+if [ ! -d "terraform" ] || [ ! -d "ansible" ]; then
+    echo "❌ Error: Still not in correct directory after location attempt"
     echo "Expected structure: terraform/ and ansible/ directories"
+    echo "Current directory: $(pwd)"
     exit 1
 fi
 
-# Check dependencies
+echo "📁 Working directory: $(pwd)"
 echo "🔍 Checking dependencies..."
+
+# Source version configuration
+source "$REPO_ROOT/version-config.sh"
 
 # Check Terraform
 if ! command -v terraform &> /dev/null; then
@@ -24,7 +58,7 @@ if ! command -v terraform &> /dev/null; then
 fi
 
 # Check Terraform version
-REQUIRED_TERRAFORM_VERSION="1.12.0"
+REQUIRED_TERRAFORM_VERSION="$TERRAFORM_VERSION"
 CURRENT_TERRAFORM_VERSION=$(terraform version -json | jq -r '.terraform_version' 2>/dev/null || terraform version | grep -oP 'Terraform v\K[0-9.]+' | head -1)
 
 version_compare() {

@@ -49,9 +49,12 @@ aws configure
 cp terraform/terraform.tfvars.example terraform/terraform.tfvars
 # Edit terraform.tfvars with your settings
 
-# Deploy with one command
+# Deploy with one command (make sure you're in the project directory)
+cd terraform-aws-ansible
 ./deploy.sh ~/.ssh/your-aws-key.pem
 ```
+
+**Note**: The deploy script will automatically detect and change to the correct directory if needed.
 
 ## Manual Setup (Alternative)
 
@@ -180,6 +183,40 @@ ansible-playbook -i inventory/hosts.ini playbooks/site.yml --ask-vault-pass
    ```bash
    # The script now handles this automatically with -o flag
    # If you see prompts, answer 'A' for All
+   ```
+
+### Deployment Issues:
+
+1. **"Error: Please run this script from the repository root"**:
+   ```bash
+   # Change to the project directory first
+   cd terraform-aws-ansible
+   ./deploy.sh ~/.ssh/your-aws-key.pem
+   
+   # Or run from parent directory (script will auto-detect)
+   ./terraform-aws-ansible/deploy.sh ~/.ssh/your-aws-key.pem
+   ```
+
+2. **Deploy script exits immediately after "🔍 Checking dependencies..."**:
+   ```bash
+   # Check if you're in the correct directory
+   pwd
+   ls -la
+   
+   # Should see terraform/ and ansible/ directories
+   # If not, navigate to terraform-aws-ansible directory
+   cd terraform-aws-ansible
+   ls -la
+   ```
+
+3. **Script can't find dependencies**:
+   ```bash
+   # Check if setup was run correctly
+   ./check-dependencies.sh
+   
+   # Source the correct PATH
+   source ~/.bashrc
+   export PATH="/usr/local/bin:$PATH"
    ```
 
 ### Common Issues:
