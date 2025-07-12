@@ -160,15 +160,23 @@ check_python_module() {
 
 # Function to install Python packages
 install_python_package() {
-    local package=$1
+    local package="$1"
     local success=false
+    
+    # Remove surrounding quotes if present
+    package=$(echo "$package" | sed "s/^'//; s/'$//")
     
     echo "🔧 Installing $package..."
     
     case "$PYTHON_ENV_TYPE" in
         "conda")
             if [ -n "$CONDA_ENV" ]; then
-                (conda install -y $package 2>/dev/null || conda install -y -c conda-forge $package 2>/dev/null || pip install $package) && success=true
+                # For conda, we need to separate pip arguments from package names
+                if [[ "$package" =~ ^--.*$ ]]; then
+                    pip install $package && success=true
+                else
+                    (conda install -y "$package" 2>/dev/null || conda install -y -c conda-forge "$package" 2>/dev/null || pip install "$package") && success=true
+                fi
             else
                 pip install $package && success=true
             fi
@@ -225,8 +233,8 @@ if ! command -v ansible &> /dev/null; then
     install_python_package "six"
     install_python_package "boto3"
     install_python_package "botocore"
-    install_python_package "'ansible>=4.0.0,<6.0.0'"
-    install_python_package "'ansible-core>=2.11.0,<2.13.0'"
+    install_python_package "ansible>=4.0.0,<6.0.0"
+    install_python_package "ansible-core>=2.11.0,<2.13.0"
 fi
 
 # Check Ansible version and fix compatibility issues
@@ -281,8 +289,8 @@ if [[ "$ANSIBLE_VERSION" =~ ^2\.[0-9]\. ]] || [[ "$ANSIBLE_VERSION" == "unknown"
     
     # Upgrade to a more compatible Ansible version
     echo "🔧 Installing compatible Ansible version..."
-    install_python_package "'ansible>=4.0.0,<6.0.0'"
-    install_python_package "'ansible-core>=2.11.0,<2.13.0'"
+    install_python_package "ansible>=4.0.0,<6.0.0"
+    install_python_package "ansible-core>=2.11.0,<2.13.0"
     
     # Verify the installation
     NEW_ANSIBLE_VERSION=$(ansible --version 2>/dev/null | head -1 | grep -oP 'ansible \K[0-9.]+' || echo "unknown")
