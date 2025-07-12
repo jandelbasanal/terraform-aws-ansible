@@ -106,6 +106,21 @@ if ! command -v ansible &> /dev/null; then
     exit 1
 fi
 
+# Check for required Python packages for Ansible
+echo "🔍 Checking Ansible Python dependencies..."
+if ! python3 -c "import boto3, botocore" 2>/dev/null; then
+    echo "⚠️  boto3/botocore not found in current Python environment"
+    echo "Installing required packages..."
+    if [ -d ~/.ansible-venv ]; then
+        echo "Using existing Ansible virtual environment..."
+        source ~/.ansible-venv/bin/activate
+        pip install boto3 botocore
+    else
+        echo "Installing globally..."
+        pip3 install boto3 botocore
+    fi
+fi
+
 # Check AWS CLI
 if ! command -v aws &> /dev/null; then
     echo "❌ AWS CLI not found. Please install AWS CLI first."

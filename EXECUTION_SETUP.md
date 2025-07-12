@@ -259,7 +259,40 @@ ansible-playbook -i inventory/hosts.ini playbooks/site.yml
 ## Cleanup
 
 To destroy the infrastructure:
+
+### Option 1: Using Destroy Script (Recommended)
 ```bash
-cd terraform
-terraform destroy
+# Run from repository root or parent directory
+./destroy.sh
 ```
+
+### Option 2: Manual Destroy
+```bash
+# Navigate to terraform directory
+cd terraform-aws-ansible/terraform
+
+# Destroy resources
+terraform destroy
+
+# Clean up state files (optional)
+rm -f terraform.tfstate*
+rm -rf .terraform/
+```
+
+### Complete Cleanup
+```bash
+# After destroying infrastructure
+cd terraform-aws-ansible
+
+# Remove Ansible inventory
+rm -f ansible/inventory/hosts.ini
+
+# Remove terraform state and cache
+rm -f terraform/terraform.tfstate*
+rm -rf terraform/.terraform/
+
+# Remove any temporary files
+rm -f terraform/terraform.tfvars
+```
+
+**Important**: Always run `terraform destroy` from the `terraform/` directory where the state files are located.
