@@ -72,9 +72,9 @@ sudo apt install -y curl wget git unzip python3 python3-pip python3-venv \
     software-properties-common apt-transport-https ca-certificates gnupg \
     lsb-release jq
 
-# Install Terraform v1.12.0
-wget https://releases.hashicorp.com/terraform/1.12.0/terraform_1.12.0_linux_amd64.zip
-unzip terraform_1.12.0_linux_amd64.zip
+# Install Terraform v1.12.2
+wget https://releases.hashicorp.com/terraform/1.12.2/terraform_1.12.2_linux_amd64.zip
+unzip terraform_1.12.2_linux_amd64.zip
 sudo mv terraform /usr/local/bin/
 terraform version
 
@@ -155,6 +155,32 @@ ansible-playbook -i inventory/hosts.ini playbooks/site.yml --ask-vault-pass
 ```
 
 ## Troubleshooting
+
+### Installation Issues:
+
+1. **Terraform Installation Error** (archive conflict):
+   ```bash
+   # Clean up and retry
+   ./cleanup-install.sh
+   ./setup-execution-machine.sh
+   ```
+
+2. **"cannot delete old terraform" or "Is a directory" errors**:
+   ```bash
+   # Manual cleanup
+   sudo rm -rf terraform terraform_* LICENSE.txt
+   sudo rm -f /usr/local/bin/terraform
+   rm -f terraform_*.zip*
+   
+   # Retry setup
+   ./setup-execution-machine.sh
+   ```
+
+3. **Unzip asking for confirmation** (replace files):
+   ```bash
+   # The script now handles this automatically with -o flag
+   # If you see prompts, answer 'A' for All
+   ```
 
 ### Common Issues:
 1. **Permission Denied (SSH Key)**:

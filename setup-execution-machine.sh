@@ -94,22 +94,46 @@ else
 fi
 
 if [[ "$INSTALL_TERRAFORM" == "true" ]]; then
+    # Create temporary directory for download
+    TEMP_DIR=$(mktemp -d)
+    cd "$TEMP_DIR"
+    
     # Remove old terraform if exists
     if command -v terraform &> /dev/null; then
         echo "🗑️  Removing existing Terraform installation..."
         sudo rm -f /usr/local/bin/terraform
     fi
     
+    # Clean up any existing terraform files in current directory
+    rm -rf terraform terraform_* LICENSE.txt 2>/dev/null || true
+    
     # Download specific version
     echo "📥 Downloading Terraform $REQUIRED_TERRAFORM_VERSION..."
     TERRAFORM_ZIP="terraform_${REQUIRED_TERRAFORM_VERSION}_linux_amd64.zip"
     
-    # Check if specific version exists
+    # Check if specific version exists and download
     if curl -s -f "https://releases.hashicorp.com/terraform/${REQUIRED_TERRAFORM_VERSION}/${TERRAFORM_ZIP}" --head >/dev/null 2>&1; then
         wget "https://releases.hashicorp.com/terraform/${REQUIRED_TERRAFORM_VERSION}/${TERRAFORM_ZIP}"
-        unzip "$TERRAFORM_ZIP"
-        sudo mv terraform /usr/local/bin/
-        rm "$TERRAFORM_ZIP"
+        
+        # Extract with overwrite (quiet mode)
+        unzip -o "$TERRAFORM_ZIP" >/dev/null 2>&1
+        
+        # Verify terraform binary exists
+        if [[ -f "./terraform" ]]; then
+            chmod +x ./terraform
+            sudo mv ./terraform /usr/local/bin/
+            echo "✅ Terraform binary installed to /usr/local/bin/"
+        else
+            echo "❌ Terraform binary not found after extraction"
+            exit 1
+        fi
+        
+        # Clean up temporary files
+        rm -f "$TERRAFORM_ZIP" LICENSE.txt 2>/dev/null || true
+        
+        # Return to original directory
+        cd - >/dev/null
+        rm -rf "$TEMP_DIR"
         
         # Verify installation
         INSTALLED_VERSION=$(terraform version | grep -oP 'Terraform v\K[0-9.]+' | head -1)
@@ -148,19 +172,32 @@ else
 fi
 
 if [[ "$INSTALL_AWS_CLI" == "true" ]]; then
+    # Create temporary directory for download
+    TEMP_DIR=$(mktemp -d)
+    cd "$TEMP_DIR"
+    
     # Remove old AWS CLI if exists
     if command -v aws &> /dev/null; then
-        sudo rm -rf /usr/local/aws-cli
-        sudo rm -f /usr/local/bin/aws
-        sudo rm -f /usr/local/bin/aws_completer
+        echo "🗑️  Removing existing AWS CLI installation..."
+        sudo rm -rf /usr/local/aws-cli 2>/dev/null || true
+        sudo rm -f /usr/local/bin/aws 2>/dev/null || true
+        sudo rm -f /usr/local/bin/aws_completer 2>/dev/null || true
     fi
     
     # Install AWS CLI v2
-    cd /tmp
+    echo "📥 Downloading AWS CLI v2..."
     curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-    unzip awscliv2.zip
-    sudo ./aws/install
+    
+    # Extract with overwrite (quiet mode)
+    unzip -o awscliv2.zip >/dev/null 2>&1
+    
+    # Install
+    sudo ./aws/install --update 2>/dev/null || sudo ./aws/install
+    
+    # Clean up
     rm -rf aws awscliv2.zip
+    cd - >/dev/null
+    rm -rf "$TEMP_DIR"
     
     # Verify installation
     AWS_INSTALLED_VERSION=$(aws --version | grep -oP 'aws-cli/\K[0-9.]+')
