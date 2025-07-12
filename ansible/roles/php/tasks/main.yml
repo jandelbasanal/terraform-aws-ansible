@@ -1,0 +1,49 @@
+---
+# PHP installation and configuration
+- name: Install PHP and required modules
+  apt:
+    name:
+      - php
+      - php-mysql
+      - php-curl
+      - php-gd
+      - php-mbstring
+      - php-xml
+      - php-xmlrpc
+      - php-soap
+      - php-intl
+      - php-zip
+      - php-fpm
+      - libapache2-mod-php
+    state: present
+
+- name: Configure PHP settings
+  lineinfile:
+    path: /etc/php/8.1/apache2/php.ini
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    backup: yes
+  loop:
+    - { regexp: '^upload_max_filesize', line: 'upload_max_filesize = 64M' }
+    - { regexp: '^post_max_size', line: 'post_max_size = 64M' }
+    - { regexp: '^memory_limit', line: 'memory_limit = 256M' }
+    - { regexp: '^max_execution_time', line: 'max_execution_time = 300' }
+    - { regexp: '^max_input_vars', line: 'max_input_vars = 3000' }
+  notify: restart apache
+
+- name: Check if PHP info page exists
+  stat:
+    path: /var/www/html/info.php
+  register: php_info
+
+- name: Create PHP info page for testing
+  copy:
+    content: |
+      <?php
+      phpinfo();
+      ?>
+    dest: /var/www/html/info.php
+    owner: www-data
+    group: www-data
+    mode: '0644'
+  when: not php_info.stat.exists

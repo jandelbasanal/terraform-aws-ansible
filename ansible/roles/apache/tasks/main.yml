@@ -1,0 +1,49 @@
+---
+# Apache installation and configuration
+- name: Install Apache web server
+  apt:
+    name:
+      - apache2
+      - apache2-utils
+    state: present
+
+- name: Start and enable Apache service
+  systemd:
+    name: apache2
+    state: started
+    enabled: yes
+
+- name: Enable Apache modules
+  apache2_module:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - rewrite
+    - ssl
+    - headers
+  notify: restart apache
+
+- name: Create WordPress virtual host
+  template:
+    src: wordpress.conf.j2
+    dest: /etc/apache2/sites-available/wordpress.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart apache
+
+- name: Enable WordPress site
+  command: a2ensite wordpress.conf
+  notify: restart apache
+
+- name: Disable default Apache site
+  command: a2dissite 000-default.conf
+  notify: restart apache
+
+- name: Set Apache user permissions
+  file:
+    path: /var/www/html
+    owner: www-data
+    group: www-data
+    mode: '0755'
+    recurse: yes

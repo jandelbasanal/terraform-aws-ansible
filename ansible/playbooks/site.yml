@@ -1,0 +1,47 @@
+---
+# Main playbook for WordPress deployment
+- name: Deploy WordPress on EC2 instance
+  hosts: wordpress
+  become: yes
+  gather_facts: yes
+  vars:
+    mysql_root_password: "{{ vault_mysql_root_password | default('changeme123!') }}"
+    mysql_wordpress_password: "{{ vault_mysql_wordpress_password | default('wordpress123!') }}"
+    wordpress_db_name: "wordpress"
+    wordpress_db_user: "wordpress"
+    wordpress_title: "My WordPress Site"
+    wordpress_admin_user: "admin"
+    wordpress_admin_password: "{{ vault_wordpress_admin_password | default('admin123!') }}"
+    wordpress_admin_email: "admin@example.com"
+    
+  pre_tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      
+    - name: Wait for system to be ready
+      wait_for_connection:
+        connect_timeout: 20
+        sleep: 5
+        delay: 5
+        timeout: 300
+
+  roles:
+    - common
+    - mysql
+    - apache
+    - php
+    - wordpress
+    
+  post_tasks:
+    - name: Display WordPress site information
+      debug:
+        msg: 
+          - "WordPress installation completed successfully!"
+          - "Site URL: http://{{ ansible_default_ipv4.address }}"
+          - "Admin URL: http://{{ ansible_default_ipv4.address }}/wp-admin"
+          - "Admin Username: {{ wordpress_admin_user }}"
+          - "Admin Password: {{ wordpress_admin_password }}"
+          - "Database: {{ wordpress_db_name }}"
+          - "DB User: {{ wordpress_db_user }}"

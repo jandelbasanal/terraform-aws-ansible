@@ -52,3 +52,18 @@ Thumbs.db
 
 # Ignore lock files (optional - some teams prefer to commit these)
 .terraform.lock.hcl
+
+# Ansible specific files
+*.retry
+ansible.log
+.vault_pass
+*.vault
+
+# SSH keys (if stored in repository)
+*.pem
+*.key
+id_rsa*
+
+# Temporary files
+*.tmp
+*.temp

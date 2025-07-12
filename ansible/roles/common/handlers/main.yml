@@ -1,0 +1,5 @@
+---
+# Common handlers
+- name: enable ufw
+  ufw:
+    state: enabled
