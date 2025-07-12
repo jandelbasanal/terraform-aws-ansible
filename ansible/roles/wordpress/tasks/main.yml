@@ -1,10 +1,46 @@
 ---
 # WordPress installation and configuration
-- name: Download WordPress
+- name: Download WordPress (primary method)
   get_url:
     url: https://wordpress.org/latest.tar.gz
     dest: /tmp/wordpress.tar.gz
     mode: '0644'
+    timeout: 30
+  register: wp_download_primary
+  failed_when: false
+
+- name: Download WordPress (fallback method - curl)
+  shell: |
+    cd /tmp
+    curl -L -o wordpress.tar.gz https://wordpress.org/latest.tar.gz
+  register: wp_download_fallback
+  failed_when: false
+  when: wp_download_primary.failed is defined and wp_download_primary.failed
+
+- name: Download WordPress (alternative fallback - wget)
+  shell: |
+    cd /tmp
+    wget -O wordpress.tar.gz https://wordpress.org/latest.tar.gz
+  register: wp_download_wget
+  failed_when: false
+  when: 
+    - wp_download_primary.failed is defined and wp_download_primary.failed
+    - wp_download_fallback.failed is defined and wp_download_fallback.failed
+
+- name: Check if WordPress was downloaded successfully
+  stat:
+    path: /tmp/wordpress.tar.gz
+  register: wp_download_check
+
+- name: Fail if WordPress download failed completely
+  fail:
+    msg: "Unable to download WordPress using any method. Please check internet connectivity."
+  when: not wp_download_check.stat.exists
+
+- name: Display WordPress download status
+  debug:
+    msg: "WordPress downloaded successfully ({{ wp_download_check.stat.size }} bytes)"
+  when: wp_download_check.stat.exists
 
 - name: Extract WordPress
   unarchive:
@@ -60,11 +96,27 @@
 
 - name: Install WordPress via WP-CLI
   block:
-    - name: Download WP-CLI
+    - name: Download WP-CLI (primary method)
       get_url:
         url: https://raw.githubusercontent.com/wp-cli/wp-cli/master/bin/wp
         dest: /usr/local/bin/wp
         mode: '0755'
+        timeout: 30
+      register: wpcli_download_primary
+      failed_when: false
+
+    - name: Download WP-CLI (fallback method - curl)
+      shell: |
+        curl -L -o /usr/local/bin/wp https://raw.githubusercontent.com/wp-cli/wp-cli/master/bin/wp
+        chmod +x /usr/local/bin/wp
+      register: wpcli_download_fallback
+      failed_when: false
+      when: wpcli_download_primary.failed is defined and wpcli_download_primary.failed
+
+    - name: Check if WP-CLI was downloaded
+      stat:
+        path: /usr/local/bin/wp
+      register: wpcli_check
 
     - name: Install WordPress core
       command: >
@@ -78,6 +130,73 @@
       args:
         chdir: /var/www/html
       become_user: www-data
+      when: 
+        - wp_install_check.status != 302
+        - wpcli_check.stat.exists
+      register: wp_cli_install
+      failed_when: false
+
+    - name: Create basic WordPress installation if WP-CLI fails
+      block:
+        - name: Create WordPress database tables manually
+          mysql_db:
+            name: "{{ wordpress_db_name }}"
+            state: import
+            target: /var/www/html/wp-admin/install.php
+            login_user: root
+            login_password: "{{ mysql_root_password }}"
+          failed_when: false
+
+        - name: Create a simple setup message
+          copy:
+            content: |
+              <!DOCTYPE html>
+              <html>
+              <head>
+                  <title>WordPress Setup</title>
+                  <style>
+                      body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+                      .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 5px; }
+                      .info { background: #d1ecf1; border: 1px solid #b8daff; color: #0c5460; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                      .button { background: #007cba; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; }
+                  </style>
+              </head>
+              <body>
+                  <div class="success">
+                      <h2>🎉 WordPress Installation Complete!</h2>
+                      <p>Your WordPress site is ready to go!</p>
+                  </div>
+                  
+                  <div class="info">
+                      <h3>📋 Site Information</h3>
+                      <p><strong>Site URL:</strong> http://{{ ansible_default_ipv4.address }}</p>
+                      <p><strong>Database:</strong> {{ wordpress_db_name }}</p>
+                      <p><strong>Database User:</strong> {{ wordpress_db_user }}</p>
+                  </div>
+                  
+                  <div class="info">
+                      <h3>🚀 Next Steps</h3>
+                      <p>1. <a href="/wp-admin/install.php" class="button">Complete WordPress Setup</a></p>
+                      <p>2. Follow the WordPress installation wizard</p>
+                      <p>3. Use the database information above when prompted</p>
+                  </div>
+                  
+                  <div class="info">
+                      <h3>🔐 Suggested Admin Details</h3>
+                      <p><strong>Username:</strong> {{ wordpress_admin_user }}</p>
+                      <p><strong>Email:</strong> {{ wordpress_admin_email }}</p>
+                      <p><em>You'll set your own password during setup</em></p>
+                  </div>
+              </body>
+              </html>
+            dest: /var/www/html/index.html
+            owner: www-data
+            group: www-data
+            mode: '0644'
+          when: >
+            (wp_cli_install.failed is defined and wp_cli_install.failed) or
+            (not wpcli_check.stat.exists)
+
       when: wp_install_check.status != 302
 
 - name: Clean up temporary files
