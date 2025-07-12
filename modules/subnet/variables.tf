@@ -1,7 +1,14 @@
-output "public_subnet_1_id" {
-  value = aws_subnet.public_1.id
+variable "vpc_id" {
+  description = "ID of the VPC"
+  type        = string
 }
 
-output "public_subnet_2_id" {
-  value = aws_subnet.public_2.id
+variable "public_subnet_1_cidr" {
+  description = "CIDR block for public subnet 1"
+  type        = string
+}
+
+variable "public_subnet_2_cidr" {
+  description = "CIDR block for public subnet 2"
+  type        = string
 }

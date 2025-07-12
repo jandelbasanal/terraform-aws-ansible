@@ -1,11 +1,9 @@
-variable "vpc_id" {
-  type = string
+output "public_subnet_1_id" {
+  description = "ID of public subnet 1"
+  value       = aws_subnet.public_1.id
 }
 
-variable "public_subnet_1_cidr" {
-  type = string
-}
-
-variable "public_subnet_2_cidr" {
-  type = string
+output "public_subnet_2_id" {
+  description = "ID of public subnet 2"
+  value       = aws_subnet.public_2.id
 }
