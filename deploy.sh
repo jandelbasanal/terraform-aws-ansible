@@ -108,17 +108,24 @@ fi
 
 # Check for required Python packages for Ansible
 echo "🔍 Checking Ansible Python dependencies..."
-if ! python3 -c "import boto3, botocore" 2>/dev/null; then
-    echo "⚠️  boto3/botocore not found in current Python environment"
+if ! python3 -c "import boto3, botocore, six" 2>/dev/null; then
+    echo "⚠️  Missing Python dependencies (boto3/botocore/six)"
     echo "Installing required packages..."
     if [ -d ~/.ansible-venv ]; then
         echo "Using existing Ansible virtual environment..."
         source ~/.ansible-venv/bin/activate
-        pip install boto3 botocore
+        pip install boto3 botocore six
     else
         echo "Installing globally..."
-        pip3 install boto3 botocore
+        pip3 install boto3 botocore six
     fi
+fi
+
+# Ensure we're using the correct Ansible environment
+if [ -d ~/.ansible-venv ]; then
+    echo "🔧 Activating Ansible virtual environment..."
+    source ~/.ansible-venv/bin/activate
+    export PATH="~/.ansible-venv/bin:$PATH"
 fi
 
 # Check AWS CLI
@@ -225,9 +232,10 @@ echo "📝 Step 3: Configuring Ansible inventory..."
 cd ansible
 
 # Update inventory with the actual IP
+SSH_KEY_ABSOLUTE=$(realpath "$SSH_KEY_PATH")
 cat > inventory/hosts.ini << EOF
 [wordpress]
-$PUBLIC_IP ansible_ssh_private_key_file=$SSH_KEY_PATH
+$PUBLIC_IP ansible_ssh_private_key_file=$SSH_KEY_ABSOLUTE
 
 [wordpress:vars]
 ansible_user=ubuntu
@@ -235,7 +243,7 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no'
 EOF
 
 # Update ansible.cfg with the correct key path
-sed -i.bak "s|private_key_file = ~/.ssh/your-key.pem|private_key_file = $SSH_KEY_PATH|" ansible.cfg
+sed -i.bak "s|private_key_file = ~/.ssh/your-key.pem|private_key_file = $SSH_KEY_ABSOLUTE|" ansible.cfg
 
 echo "✅ Inventory configured with IP: $PUBLIC_IP"
 
@@ -243,14 +251,27 @@ echo "✅ Inventory configured with IP: $PUBLIC_IP"
 echo ""
 echo "📦 Step 4: Deploying WordPress with Ansible..."
 
+# Ensure we're using the correct Ansible environment
+if [ -d ~/.ansible-venv ]; then
+    source ~/.ansible-venv/bin/activate
+fi
+
 # Test connectivity first
 echo "Testing Ansible connectivity..."
-ansible all -i inventory/hosts.ini -m ping
+ansible all -i inventory/hosts.ini -m ping -vv
 
 if [ $? -eq 0 ]; then
     echo "✅ Ansible connectivity test passed!"
 else
     echo "❌ Ansible connectivity test failed!"
+    echo "🔍 Troubleshooting info:"
+    echo "  SSH Key: $SSH_KEY_ABSOLUTE"
+    echo "  Target IP: $PUBLIC_IP"
+    echo "  Inventory file:"
+    cat inventory/hosts.ini
+    echo ""
+    echo "🔧 Try manual SSH test:"
+    echo "  ssh -i $SSH_KEY_ABSOLUTE ubuntu@$PUBLIC_IP"
     exit 1
 fi
 

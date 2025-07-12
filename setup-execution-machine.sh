@@ -241,7 +241,7 @@ if [[ "$INSTALL_ANSIBLE" == "true" ]]; then
     pip install --upgrade pip
     
     # Install Ansible and required packages
-    pip install "ansible>=$REQUIRED_ANSIBLE_VERSION" PyMySQL boto3 botocore
+    pip install "ansible>=$REQUIRED_ANSIBLE_VERSION" PyMySQL boto3 botocore six
     
     # Create symlink for global access
     sudo ln -sf ~/.ansible-venv/bin/ansible /usr/local/bin/ansible
