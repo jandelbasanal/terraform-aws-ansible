@@ -36,13 +36,66 @@
     - wordpress
     
   post_tasks:
-    - name: Display WordPress site information
+    - name: Final WordPress site information
       debug:
         msg: 
-          - "WordPress installation completed successfully!"
-          - "Site URL: http://{{ ansible_default_ipv4.address }}"
-          - "Admin URL: http://{{ ansible_default_ipv4.address }}/wp-admin"
-          - "Admin Username: {{ wordpress_admin_user }}"
-          - "Admin Password: {{ wordpress_admin_password }}"
-          - "Database: {{ wordpress_db_name }}"
-          - "DB User: {{ wordpress_db_user }}"
+          - "🎉 WORDPRESS DEPLOYMENT SUCCESSFUL!"
+          - "=================================="
+          - ""
+          - "🌐 Your WordPress site is live at:"
+          - "   🖥️  Frontend: http://{{ ansible_default_ipv4.address }}"
+          - "   🔧 Admin Panel: http://{{ ansible_default_ipv4.address }}/wp-admin"
+          - ""
+          - "🔐 Admin Login Details:"
+          - "   👤 Username: {{ wordpress_admin_user }}"
+          - "   🔑 Password: {{ wordpress_admin_password }}"
+          - "   📧 Email: {{ wordpress_admin_email }}"
+          - ""
+          - "📊 Your Server Details:"
+          - "   🖥️  IP Address: {{ ansible_default_ipv4.address }}"
+          - "   💾 Database: {{ wordpress_db_name }}"
+          - "   👥 DB User: {{ wordpress_db_user }}"
+          - "   🐧 OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - ""
+          - "⚠️  IMPORTANT SECURITY STEPS:"
+          - "   1. 🔐 Change admin password immediately!"
+          - "   2. 🔄 Keep WordPress updated"
+          - "   3. 🛡️  Install security plugins"
+          - ""
+          - "🚀 Next Steps:"
+          - "   • Visit your site: http://{{ ansible_default_ipv4.address }}"
+          - "   • Login to admin: http://{{ ansible_default_ipv4.address }}/wp-admin"
+          - "   • Choose a theme and start customizing!"
+          - ""
+          - "✅ Deployment Complete - Enjoy your WordPress site!"
+
+    - name: Save site details to file
+      copy:
+        content: |
+          WordPress Site Information
+          ==========================
+          
+          Site URL: http://{{ ansible_default_ipv4.address }}
+          Admin URL: http://{{ ansible_default_ipv4.address }}/wp-admin
+          
+          Login Credentials:
+          Username: {{ wordpress_admin_user }}
+          Password: {{ wordpress_admin_password }}
+          Email: {{ wordpress_admin_email }}
+          
+          Database Details:
+          Database: {{ wordpress_db_name }}
+          DB User: {{ wordpress_db_user }}
+          
+          Server Information:
+          IP Address: {{ ansible_default_ipv4.address }}
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          
+          Generated on: {{ ansible_date_time.iso8601 }}
+        dest: /tmp/wordpress-site-info.txt
+        mode: '0600'
+      delegate_to: localhost
+
+    - name: Display saved information location
+      debug:
+        msg: "📋 Site details saved to: /tmp/wordpress-site-info.txt"

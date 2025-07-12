@@ -10,41 +10,93 @@
 
 - name: Display current MySQL status
   debug:
-    msg: "MySQL Status: {{ 'Already installed - ' + mysql_current_version.stdout if mysql_current_version.rc == 0 else 'Not installed, will install latest' }}"
+    msg: "MySQL Status: {{ 'Already installed - ' + mysql_current_version.stdout if mysql_current_version.rc == 0 else 'Not installed, will install latest available' }}"
+  tags: [mysql]
 
-# Add MySQL APT repository for latest version
+# Try to add MySQL APT repository for latest version (with fallback)
 - name: Download MySQL APT repository package
   get_url:
     url: https://dev.mysql.com/get/mysql-apt-config_0.8.24-1_all.deb
     dest: /tmp/mysql-apt-config.deb
     mode: '0644'
+    timeout: 30
+  register: mysql_repo_download
+  failed_when: false
   when: mysql_current_version.rc != 0
+  tags: [mysql]
 
 - name: Install MySQL APT repository
   apt:
     deb: /tmp/mysql-apt-config.deb
     state: present
-  when: mysql_current_version.rc != 0
+  register: mysql_repo_install
+  failed_when: false
+  when: 
+    - mysql_current_version.rc != 0
+    - mysql_repo_download.failed is not defined or not mysql_repo_download.failed
 
 - name: Update apt cache after adding MySQL repository
   apt:
     update_cache: yes
-  when: mysql_current_version.rc != 0
+  register: mysql_repo_update
+  failed_when: false
+  when: 
+    - mysql_current_version.rc != 0
+    - mysql_repo_install.failed is not defined or not mysql_repo_install.failed
 
-# Install MySQL server with latest version
-- name: Install MySQL server
+- name: Check if MySQL repository was added successfully
+  shell: apt-cache policy mysql-server | grep -i mysql || echo "Using default repositories"
+  register: mysql_repo_check
+  changed_when: false
+
+- name: Display MySQL repository status
+  debug:
+    msg: "MySQL Repository: {{ 'MySQL official repository added' if 'mysql' in mysql_repo_check.stdout else 'Using Ubuntu default repositories' }}"
+
+# Install MySQL server (try latest first, fall back to default)
+- name: Install MySQL server (latest from MySQL repository)
   apt:
     name:
       - mysql-server
       - mysql-client
       - python3-pymysql
     state: present
+    update_cache: yes
+  register: mysql_install_latest
+  failed_when: false
+  when: 
+    - "'mysql' in mysql_repo_check.stdout"
+
+- name: Install MySQL server (fallback to Ubuntu default)
+  apt:
+    name:
+      - mysql-server
+      - mysql-client
+      - python3-pymysql
+    state: present
+    update_cache: yes
+  register: mysql_install_default
+  when: >
+    (mysql_install_latest.failed is defined and mysql_install_latest.failed) or
+    (mysql_install_latest.skipped is defined and mysql_install_latest.skipped)
+
+- name: Verify MySQL installation
+  command: mysql --version
+  register: mysql_verify
+  failed_when: mysql_verify.rc != 0
+  changed_when: false
+
+- name: Display installed MySQL version
+  debug:
+    msg: "Installed MySQL version: {{ mysql_verify.stdout }}"
+  tags: [mysql]
 
 - name: Start and enable MySQL service
   systemd:
     name: mysql
     state: started
     enabled: yes
+  tags: [mysql]
 
 - name: Set MySQL root password
   mysql_user:

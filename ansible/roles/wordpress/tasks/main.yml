@@ -87,3 +87,46 @@
   loop:
     - /tmp/wordpress.tar.gz
     - /tmp/wordpress
+
+- name: Wait for WordPress to be ready
+  uri:
+    url: "http://{{ ansible_default_ipv4.address }}"
+    method: GET
+    status_code: [200, 302]
+  register: wordpress_ready
+  retries: 3
+  delay: 5
+  until: wordpress_ready.status in [200, 302]
+
+- name: Display WordPress installation success
+  debug:
+    msg:
+      - "🎉 WordPress Installation Completed Successfully!"
+      - "=================================================="
+      - ""
+      - "🌐 Your WordPress site is now available at:"
+      - "   Frontend: http://{{ ansible_default_ipv4.address }}"
+      - "   Admin Panel: http://{{ ansible_default_ipv4.address }}/wp-admin"
+      - ""
+      - "🔐 WordPress Admin Credentials:"
+      - "   Username: {{ wordpress_admin_user }}"
+      - "   Password: {{ wordpress_admin_password }}"
+      - "   Email: {{ wordpress_admin_email }}"
+      - ""
+      - "📊 System Information:"
+      - "   Server IP: {{ ansible_default_ipv4.address }}"
+      - "   OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+      - "   PHP Version: {{ php_version | default('Detected during installation') }}"
+      - "   MySQL Version: {{ mysql_verify.stdout | default('Latest available') }}"
+      - ""
+      - "⚠️  Security Reminders:"
+      - "   1. Change the default admin password immediately!"
+      - "   2. Keep WordPress core and plugins updated"
+      - "   3. Consider enabling HTTPS with SSL certificate"
+      - ""
+      - "📝 Quick Links:"
+      - "   - WordPress Dashboard: http://{{ ansible_default_ipv4.address }}/wp-admin"
+      - "   - PHP Info: http://{{ ansible_default_ipv4.address }}/info.php"
+      - "   - Install plugins: http://{{ ansible_default_ipv4.address }}/wp-admin/plugin-install.php"
+      - ""
+      - "✅ Installation Complete!"
